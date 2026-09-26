@@ -1,9 +1,12 @@
-# Step 1: Import Libraries and Load the Model
+# Step 1: Import Libraries and Configure Page
+import streamlit as st
 import numpy as np
 import tensorflow as tf
 from tensorflow.keras.datasets import imdb
 from tensorflow.keras.preprocessing import sequence
 from tensorflow.keras.models import load_model
+
+st.set_page_config(page_title='IMDB Sentiment Analysis', page_icon='🎬', layout='centered')
 
 # Load the IMDB dataset word index
 word_index = imdb.get_word_index()
@@ -27,11 +30,6 @@ def preprocess_text(text):
     encoded_review = [word_index.get(word, 2) + 3 for word in words]
     padded_review = sequence.pad_sequences([encoded_review], maxlen=500)
     return padded_review
-
-
-import streamlit as st
-
-st.set_page_config(page_title='IMDB Sentiment Analysis', page_icon='🎬', layout='centered')
 
 st.markdown("""
 <style>
