@@ -9,8 +9,12 @@ from tensorflow.keras.models import load_model
 word_index = imdb.get_word_index()
 reverse_word_index = {value: key for key, value in word_index.items()}
 
-# Load the pre-trained model with ReLU activation
-model = load_model('simple_rnn_imdb.keras')
+# Load the pre-trained model with ReLU activation (cached to load once)
+@st.cache_resource
+def load_imdb_model():
+    return load_model('simple_rnn_imdb.keras')
+
+model = load_imdb_model()
 
 # Step 2: Helper Functions
 # Function to decode reviews
