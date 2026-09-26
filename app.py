@@ -1,63 +1,98 @@
-import json
-import re
-
-from flask import Flask, render_template, request, jsonify
+# Step 1: Import Libraries and Load the Model
+import numpy as np
+import tensorflow as tf
+from tensorflow.keras.datasets import imdb
+from tensorflow.keras.preprocessing import sequence
 from tensorflow.keras.models import load_model
-from tensorflow.keras.preprocessing.sequence import pad_sequences
 
-app = Flask(__name__)
+# Load the IMDB dataset word index
+word_index = imdb.get_word_index()
+reverse_word_index = {value: key for key, value in word_index.items()}
 
-# ---- Config: must match training exactly ----
-MAXLEN = 200
-NUM_WORDS = 10000
-MODEL_PATH = 'sentiment_model.keras'      # or 'sentiment_model.keras'
-WORD_INDEX_PATH = 'word_index.json'
+# Load the pre-trained model with ReLU activation
+model = load_model('simple_rnn_imdb.h5')
 
-# ---- Load model + word index once, at startup ----
-model = load_model(MODEL_PATH)
+# Step 2: Helper Functions
+# Function to decode reviews
+def decode_review(encoded_review):
+    return ' '.join([reverse_word_index.get(i - 3, '?') for i in encoded_review])
 
-with open(WORD_INDEX_PATH) as f:
-    word_index = json.load(f)
-
-
-def encode_review(text, word_index, num_words=NUM_WORDS, maxlen=MAXLEN):
-    """Turns a raw review string into the padded integer sequence
-    the model expects. Mirrors how imdb.load_data() encodes text:
-    0 = padding, 1 = start, 2 = out-of-vocabulary, real words = index + 3."""
-    tokens = re.findall(r"[a-z']+", text.lower())  # strips punctuation, keeps words
-    seq = [1]  # start token
-    for t in tokens:
-        idx = word_index.get(t)
-        if idx is not None and idx + 3 < num_words:
-            seq.append(idx + 3)
-        else:
-            seq.append(2)  # unknown / out-of-vocab
-    return pad_sequences([seq], maxlen=maxlen, padding='post')
+# Function to preprocess user input
+def preprocess_text(text):
+    words = text.lower().split()
+    encoded_review = [word_index.get(word, 2) + 3 for word in words]
+    padded_review = sequence.pad_sequences([encoded_review], maxlen=500)
+    return padded_review
 
 
-@app.route('/')
-def home():
-    return render_template('index.html')
+import streamlit as st
 
+st.set_page_config(page_title='IMDB Sentiment Analysis', page_icon='🎬', layout='centered')
 
-@app.route('/predict', methods=['POST'])
-def predict():
-    data = request.get_json(silent=True) or {}
-    review = data.get('review', '').strip()
+st.markdown("""
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:wght@600&family=Inter:wght@400;500;600&display=swap');
 
-    if not review:
-        return jsonify({'error': 'No review text provided'}), 400
+html, body, [class*="css"] { font-family: 'Inter', sans-serif; }
 
-    encoded = encode_review(review, word_index)
-    probability = float(model.predict(encoded, verbose=0)[0][0])
+.block-container { max-width: 640px; padding-top: 3rem; }
 
-    return jsonify({'probability': probability})
+h1 {
+    font-family: 'Source Serif 4', Georgia, serif !important;
+    font-weight: 600 !important;
+    font-size: 30px !important;
+    margin-bottom: 4px !important;
+}
 
+.stCaption, p { color: #6A7078; }
 
-import os
+.stTextArea textarea {
+    font-family: 'Source Serif 4', Georgia, serif;
+    font-size: 16px;
+    border-radius: 10px;
+    border: 1px solid #DAD9D2;
+}
 
-if __name__ == '__main__':
-    # host='0.0.0.0' makes it reachable from other devices on your network,
-    # not just localhost -- useful if "other users" means people on the same LAN.
-    port = int(os.getenv('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=True)
+.stButton button {
+    background-color: #2B5F5E;
+    color: #F3F3EF;
+    border: none;
+    border-radius: 8px;
+    padding: 0.5rem 1.5rem;
+    font-weight: 600;
+}
+.stButton button:hover {
+    background-color: #234c4b;
+    color: #F3F3EF;
+}
+
+div[data-testid="stVerticalBlock"] > div:has(.stTextArea) {
+    background: #FFFFFF;
+    border: 1px solid #DAD9D2;
+    border-radius: 10px;
+    padding: 20px;
+}
+</style>
+""", unsafe_allow_html=True)
+
+## streamlit app
+# Streamlit app
+st.title('IMDB Movie Review Sentiment Analysis')
+st.write('Enter a movie review to classify it as positive or negative.')
+
+# User input
+user_input = st.text_area('Movie Review')
+
+if st.button('Classify'):
+
+    preprocessed_input=preprocess_text(user_input)
+
+    ## MAke prediction
+    prediction=model.predict(preprocessed_input)
+    sentiment='Positive' if prediction[0][0] > 0.5 else 'Negative'
+
+    # Display the result
+    st.write(f'Sentiment: {sentiment}')
+    st.write(f'Prediction Score: {prediction[0][0]}')
+else:
+    st.write('Please enter a movie review.')
